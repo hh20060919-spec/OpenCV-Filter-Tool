@@ -4,8 +4,8 @@ import numpy as np
 from PIL import Image
 
 # 1. 頁面基本配置
-st.set_page_config(page_title="矩陣實驗室", layout="wide")
-st.title("🎨 影像矩陣對比實驗室")
+st.set_page_config(page_title="超級大的皮包", layout="wide")
+st.title("🎨 超級大的皮包")
 
 # 2. 側邊欄設定 (合併選項)
 st.sidebar.header("🎛️ 參數設定")
