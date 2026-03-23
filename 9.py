@@ -3,67 +3,63 @@ import cv2
 import numpy as np
 from PIL import Image
 
-st.set_page_config(page_title="超級大的皮包", layout="wide")
-st.title("🎨 超級大的皮包")
+st.set_page_config(page_title="專業影像實驗室", layout="wide")
+st.title("🎨 影像矩陣實驗室 (可選矩陣大小)")
 
 # --- 側邊欄控制區 ---
-st.sidebar.header("🎛️ 影像控制面板")
+st.sidebar.header("🎛️ 濾鏡參數設定")
 
-# 1. 濾鏡模式選擇
+# 1. 選擇矩陣大小 (Kernel Size)
+k_size_str = st.sidebar.selectbox("選擇矩陣大小 (Kernel Size)", ["3x3", "5x5", "7x7", "9x9", "11x11"])
+k_size = int(k_size_str.split('x')[0]) # 把 "3x3" 變成數字 3
+
+# 2. 濾鏡模式選擇
 filter_mode = st.sidebar.selectbox(
     "選擇濾鏡模式",
     ["浮雕立體 (Emboss)", "影像銳化 (Sharpen)", "邊緣偵測 (Edge Detection)", "高斯模糊 (Blur)"]
 )
 
-# 2. 強度調整滑桿
-val = st.sidebar.slider("濾鏡影響強度", 1, 30, 10)
+# 3. 強度調整滑桿
+val = st.sidebar.slider("濾鏡強度 (Intensity)", 1, 30, 10)
 
-# 3. 亮度與對比度
-brightness = st.sidebar.slider("亮度調整", -100, 100, 0)
-contrast = st.sidebar.slider("對比度調整", 1.0, 3.0, 1.0)
-
-# --- 濾鏡邏輯定義 ---
-def get_kernel(mode, intensity):
+# --- 動態矩陣邏輯 ---
+def create_dynamic_kernel(mode, size, intensity):
+    # 初始化一個全為 0 的矩陣
+    kernel = np.zeros((size, size), dtype=np.float32)
+    center = size // 2
+    
     if mode == "浮雕立體 (Emboss)":
-        return np.array([[-3, 0, 3], [-intensity, 0, intensity], [-3, 0, 3]], dtype=np.float32)
+        # 簡單的立體邏輯：左負右正
+        kernel[:, :center] = -1
+        kernel[:, center+1:] = 1
+        kernel[center, :] *= intensity
+        return kernel
+    
     elif mode == "影像銳化 (Sharpen)":
-        return np.array([[0, -1, 0], [-1, 5+(intensity/10), -1], [0, -1, 0]], dtype=np.float32)
+        kernel.fill(-1)
+        # 中心點權重 = 矩陣總格數 + 強度
+        kernel[center, center] = (size * size) + intensity
+        return kernel
+    
     elif mode == "邊緣偵測 (Edge Detection)":
-        return np.array([[-1, -1, -1], [-1, intensity, -1], [-1, -1, -1]], dtype=np.float32)
+        kernel.fill(-1)
+        kernel[center, center] = (size * size) - 1 + intensity
+        return kernel
+    
     elif mode == "高斯模糊 (Blur)":
-        size = (intensity // 5) * 2 + 1 # 確保是奇數
         return np.ones((size, size), np.float32) / (size * size)
+    
     return None
 
 # --- 主程式區 ---
 uploaded_file = st.file_uploader("拖曳或選擇圖片...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # 讀取圖片
     image = Image.open(uploaded_file)
-    img_array = np.array(image)
-    img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-    # A. 調整亮度與對比
-    img_cv = cv2.convertScaleAbs(img_cv, alpha=contrast, beta=brightness)
-
-    # B. 套用濾鏡
-    kernel = get_kernel(filter_mode, val)
-    delta_val = 128 if filter_mode == "浮雕立體 (Emboss)" else 0
-    output_cv = cv2.filter2D(img_cv, -1, kernel, delta=delta_val)
+    # 執行濾波處理
+    current_kernel = create_dynamic_kernel(filter_mode, k_size, val)
     
-    # 轉回 RGB 顯示
-    output_rgb = cv2.cvtColor(output_cv, cv2.COLOR_BGR2RGB)
-
-    # 顯示佈局
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("原始圖片")
-        st.image(image, use_container_width=True)
-    with col2:
-        st.subheader(f"{filter_mode} 效果")
-        st.image(output_rgb, use_container_width=True)
-
-    # 下載按鈕
-    st.sidebar.markdown("---")
-    st.sidebar.download_button("💾 下載結果", data=uploaded_file, file_name="processed_image.png")
+    # 浮雕模式通常需要灰色偏置 (delta) 比較好看
+    delta_val = 128 if
