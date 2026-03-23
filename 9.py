@@ -3,8 +3,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
-st.set_page_config(page_title="專業影像實驗室", layout="wide")
-st.title("🎨 專業影像濾鏡實驗室")
+st.set_page_config(page_title="超級大的皮包", layout="wide")
+st.title("🎨 超級大的皮包")
 
 # --- 側邊欄控制區 ---
 st.sidebar.header("🎛️ 影像控制面板")
