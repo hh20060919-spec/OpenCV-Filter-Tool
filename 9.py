@@ -1,68 +1,47 @@
+import streamlit as st
 import cv2
 import numpy as np
-import datetime
-import urllib.request
-import sys
+from PIL import Image
 
-def custom_filter(image, kernel):
-    # 使用 cv2.filter2D 套用二維矩陣濾波器
-    return cv2.filter2D(image, -1, kernel)
+st.set_page_config(page_title="OpenCV 立體濾鏡工具")
+st.title("🎨 影像立體濾鏡工具")
+st.write("上傳一張圖片，我們會套用自定義的 3D 矩陣讓它產生立體感！")
 
-def load_image_from_web(image_bytes):
-    # 網頁端傳來的圖片通常是二進位位元流 (Bytes)
-    # 利用 np.frombuffer 轉成一維陣列後，再用 cv2.imdecode 解碼成 OpenCV 格式
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-    image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    return image
+# 側邊欄：讓使用者調整矩陣數值
+st.sidebar.header("調整濾波器矩陣")
+val = st.sidebar.slider("邊緣強度", 1, 20, 10)
 
-def main():
-    if len(sys.argv) > 1:
-        # 有給參數，代表要讀取本地圖片測試 (例：python 9.py my_pic.jpg)
-        img_path = sys.argv[1]
-        print(f"嘗試讀取本地圖片: {img_path}")
-        with open(img_path, "rb") as f:
-            image_bytes = f.read()
-    else:
-        # 沒給參數的話，模擬網頁上傳：從 URL 取得圖片 bytes
-        url = "https://picsum.photos/400/400"
-        print("未提供圖片參數，正在從網路下載模擬圖片...")
-        req = urllib.request.urlopen(url)
-        image_bytes = req.read()
-    
-    # 將位元流解碼成 OpenCV 可用的圖片矩陣
-    image = load_image_from_web(image_bytes)
-    
-    if image is None:
-        print("圖片解碼失敗，將建立測試用圖片")
-        image = np.ones((400, 400, 3), dtype=np.uint8) * 100
-        cv2.circle(image, (200, 200), 100, (200, 150, 50), -1)
+# 定義 3x3 矩陣 (使用你之前的 Sobel 變體)
+kernel = np.array([
+    [-3,  0,  3],
+    [-val, 0, val],
+    [-3,  0,  3]
+], dtype=np.float32)
 
-    # 定義使圖片產生立體感（浮雕加上方向性光影）的 3x3 矩陣
-    # 權重總和為 1 可保持整體亮度不變
-    kernel_3d = np.array([
-        [-1,  -1,  -1],
-        [ -1,  -1, -1],
-        [-1,  -1, -1]
-    ], dtype=np.float32)
-    
-    # 呼叫自定義函數進行處理
-    output_image = custom_filter(image, kernel_3d)
-    
-    # 將原圖與結果水平合併以便對比顯示
-    combined = np.hstack((image, output_image))
-    
-    # 顯示對比圖
-    cv2.imshow("Original vs 3D Filter", combined)
-    
-    # 加上 datetime 時間戳記存檔
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"output_{timestamp}.jpg"
-    cv2.imwrite(output_filename, output_image)
-    print(f"結果已儲存為: {output_filename}")
-    
-    # 等待按鍵關閉
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+# 上傳檔案元件
+uploaded_file = st.file_uploader("請選擇圖片...", type=["jpg", "jpeg", "png"])
 
-if __name__ == "__main__":
-    main()
+if uploaded_file is not None:
+    # 讀取圖片並轉為 OpenCV 格式
+    image = Image.open(uploaded_file)
+    img_array = np.array(image)
+    img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+    # 執行濾波處理 (加上 delta=128 讓立體感更清晰)
+    output_cv = cv2.filter2D(img_cv, -1, kernel, delta=128)
+    
+    # 轉回 RGB 供網頁顯示
+    output_rgb = cv2.cvtColor(output_cv, cv2.COLOR_BGR2RGB)
+
+    # 顯示結果
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("原圖")
+        st.image(image, use_container_width=True)
+    with col2:
+        st.header("立體效果")
+        st.image(output_rgb, use_container_width=True)
+
+    # 下載按鈕
+    result_img = Image.fromarray(output_rgb)
+    st.download_button("下載處理後的圖片", data=uploaded_file, file_name="output.png")
